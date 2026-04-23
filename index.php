@@ -9,7 +9,8 @@
 </head>
 <body>
     <div class="container">
-        <header>
+        <header style="position: relative;">
+            <a href="admin/index.php" class="settings-btn" title="Pengaturan Admin">⚙️ Admin</a>
             <h1 id="school-name">Sistem Bel Sekolah</h1>
             <div id="date-display">Memuat tanggal...</div>
         </header>
