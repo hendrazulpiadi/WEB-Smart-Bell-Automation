@@ -1,6 +1,9 @@
 let schedule = [];
 let isRunning = false;
 
+// Base64 silent audio to keep the tab alive
+const silentAudio = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
 function updateClock() {
     const now = new Date();
     
@@ -14,6 +17,12 @@ function updateClock() {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     document.getElementById('date-display').innerText = now.toLocaleDateString('id-ID', options);
     
+    // 1. Stale Data Fix: Refresh schedule at midnight (00:00:01)
+    if (h === '00' && m === '00' && s === '01') {
+        console.log("Pergantian hari terdeteksi. Memperbarui jadwal...");
+        fetchSchedule();
+    }
+
     // Check schedule every minute (at 00 seconds)
     if (isRunning && s === '00') {
         checkSchedule(h, m);
@@ -51,19 +60,42 @@ function checkSchedule(h, m) {
     schedule.forEach(item => {
         // Compare HH:mm:ss
         if (item.waktu === timeNow && item.status === 'aktif') {
-            playBell(item.file_path);
+            playBell(item.file_path, item.kegiatan);
         }
     });
 }
 
-function playBell(path) {
-    if (!path) return;
+function playBell(path, kegiatan) {
+    const statusText = document.getElementById('status-text');
+    
+    if (!path) {
+        console.error("Gagal memutar bel: Path kosong.");
+        statusText.innerHTML = `<span style="color: #f87171;">⚠️ Gagal memutar bel "${kegiatan}": File tidak ditemukan!</span>`;
+        return;
+    }
+
     console.log("Memutar bel:", path);
     const audio = new Audio(path);
-    audio.play().catch(e => {
+    audio.play().then(() => {
+        statusText.innerHTML = `<span style="color: #60a5fa;">🔔 Sedang memutar: ${kegiatan}</span>`;
+        // Reset status after 10 seconds
+        setTimeout(() => {
+            if (isRunning) statusText.innerHTML = '<span style="color: #4ade80;">● Bel Otomatis Sedang Aktif</span>';
+        }, 10000);
+    }).catch(e => {
         console.error("Gagal memutar audio. Interaksi user diperlukan.", e);
-        alert("Gagal memutar bel otomatis. Harap klik 'Mulai Bel' lagi.");
+        statusText.innerHTML = `<span style="color: #f87171;">⚠️ Error Autoplay: Klik 'Mulai Bel' lagi.</span>`;
     });
+}
+
+// 2. Tab Sleeping Preventer: Heartbeat silent audio every 15 minutes
+function keepAlive() {
+    if (isRunning) {
+        console.log("Heartbeat: Mencegah browser menonaktifkan tab...");
+        const audio = new Audio(silentAudio);
+        audio.volume = 0.01;
+        audio.play().catch(() => {});
+    }
 }
 
 document.getElementById('start-btn').onclick = () => {
@@ -72,7 +104,7 @@ document.getElementById('start-btn').onclick = () => {
     document.getElementById('start-btn').style.display = 'none';
     
     // Enable audio context by playing a silent sound
-    const audio = new Audio();
+    const audio = new Audio(silentAudio);
     audio.play().catch(() => {});
     
     console.log("Sistem Bel Dimulai...");
@@ -80,5 +112,6 @@ document.getElementById('start-btn').onclick = () => {
 
 // Initial calls
 setInterval(updateClock, 1000);
+setInterval(keepAlive, 15 * 60 * 1000); // Heartbeat every 15 mins
 fetchSchedule();
 updateClock();
